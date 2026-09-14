@@ -23,7 +23,7 @@ MODEL = "claude-opus-4-8"
 def extract_knowledge_tree(notes:str) -> KnowledgeTree:
     response= _client.messages.parse(
         model=MODEL,
-        max_tokens=1024,
+        max_tokens=16000,
         messages=[{"role":"user" , "content":f"extract a  trunk/branch/leaf knowledge tree from these notes -> {notes}"}],
         output_format=KnowledgeTree
     )
