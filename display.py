@@ -1,7 +1,10 @@
 import sys
 import re
+import shutil
 
-WIDTH = 64
+# follow the window instead of pinning to 64 columns, so wide terminals get
+# short readable paragraphs and narrow ones never overflow the rules
+WIDTH = max(64, min(shutil.get_terminal_size((80, 24)).columns - 4, 100))
 
 # only emit colour when we're attached to a real terminal, otherwise the
 # escape codes leak into piped output
@@ -79,14 +82,31 @@ def _bar(score):
     return colour + "█" * filled + DIM + "░" * (10 - filled) + RESET
 
 
-def show_grade(score, feedback):
+def _status(score):
+    """Plain-language verdict. Banded to match the scheduler rather than picked
+    by feel: below 60 is exactly where SM-2 resets the streak."""
+    if score >= 80:
+        return GREEN, "YOU UNDERSTAND THIS"
+    if score >= 60:
+        return YELLOW, "A LITTLE MORE REVIEW"
+    return RED, "HASN'T CLICKED YET"
+
+
+def show_grade(score, strengths, improvements):
     colour = GREEN if score >= 70 else YELLOW if score >= 40 else RED
     print()
     print(_rule()) 
     print(f"  {BOLD}SCORE{RESET}  {_bar(score)}  {colour}{BOLD}{score}/100{RESET}")
     print(_rule())
     print()
-    print(_wrap(_clean(feedback)))
+    verdict_colour, verdict = _status(score)
+    print(f"  {verdict_colour}{BOLD}{verdict}{RESET}")
+    print()
+    print(f"  {GREEN}{BOLD}WHAT YOU GOT RIGHT{RESET}")
+    print(_wrap(_clean(strengths)))
+    print()
+    print(f"  {YELLOW}{BOLD}WHAT TO IMPROVE{RESET}")
+    print(_wrap(_clean(improvements)))
     print()
 
 
@@ -108,6 +128,13 @@ def menu():
         if choice in ("q", "quit", "2"):
             return "quit"
         print(f"  {DIM}Press Enter to continue, or q to quit.{RESET}")
+
+
+def error(message):
+    print()
+    print(f"  {RED}{BOLD}Something went wrong.{RESET}")
+    print(_wrap(message))
+    print()
 
 
 def caught_up():

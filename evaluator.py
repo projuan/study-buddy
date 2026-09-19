@@ -10,13 +10,25 @@ MODEL = "claude-opus-5"
 
 class Grade(BaseModel):
     score: int
-    feedback: str
+    strengths: str
+    improvements: str
 
 def evaluator(leaf:Leaf, question:str, answer:str) -> Grade:
+    # the word limit is load-bearing: unbounded feedback used to run past
+    # max_tokens and come back as truncated, unparseable JSON
+    prompt = (
+        f"Grade this answer.\n\n"
+        f"Concept: {leaf.name} - {leaf.description}\n"
+        f"Question: {question}\n"
+        f"Answer: {answer}\n\n"
+        "Score it 0-100. In 'strengths', say what the answer got right. In "
+        "'improvements', say what it missed or could state more precisely. "
+        "Keep each one under 80 words."
+    )
     message= _client.messages.parse(
          model=MODEL,
-         max_tokens=1024,
-         messages=[{"role":"user" , "content":f"Grade the {answer} based on the {leaf} and {question} provide a score from 0 to  100 and a feedback "}],
+         max_tokens=4096,
+         messages=[{"role":"user" , "content":prompt}],
          output_format=Grade
     )    
     return message.parsed_output

@@ -6,6 +6,10 @@ from evaluator import *
 from scheduler import *
 from datetime import datetime, timedelta
 import display
+import os
+import time
+
+DATA_FILE = "progress.json"
 
 
 #only leafs
@@ -25,6 +29,21 @@ def recording_leafs(leafs:list):
   return recorded_leafs
 
 
+def with_retry(action, what):
+  """API calls fail transiently. Give each one a second chance, and never let
+  one failure take the whole session down."""
+  for attempt in (1, 2):
+    try:
+      return action()
+    except Exception as exc:
+      if attempt == 1:
+        display.thinking(f"{what} failed, retrying...")
+        time.sleep(2)
+      else:
+        display.error(f"{what} failed: {exc}")
+        return None
+
+
 def lazy_generator(recorded: dict):
   while(True): 
    today = datetime.now()
@@ -41,12 +60,21 @@ def lazy_generator(recorded: dict):
    leaf = Leaf(name=name,description=description)
    display.card_header(name, size)
    display.thinking("generating question...")
-   question = quiz(leaf)
+   question = with_retry(lambda: quiz(leaf), "question generation")
+   if question is None:
+     write_json(recorded, DATA_FILE)
+     display.goodbye()
+     return
    card["question"] = question
+   write_json(recorded, DATA_FILE)
    display.show_question(question)
    answer  = read_multiline("Your answer", blanks_needed=1)
    display.thinking("grading...")
-   score =  evaluator(leaf,question , answer)
+   score = with_retry(lambda: evaluator(leaf, question, answer), "grading")
+   if score is None:
+     write_json(recorded, DATA_FILE)
+     display.goodbye()
+     return
    new_score = converter(score.score)
    r,e,it = scheduling(new_score,card["repetition"],card["ease_factor"],card["interval"])
    card["repetition"] = r
@@ -54,8 +82,8 @@ def lazy_generator(recorded: dict):
    card["interval"] = it 
    new_date = today + timedelta(days=it)
    card["due_date"] = new_date.strftime("%Y-%m-%d")
-   write_json(recorded,"test.json")
-   display.show_grade(score.score, score.feedback)
+   write_json(recorded, DATA_FILE)
+   display.show_grade(score.score, score.strengths, score.improvements)
    display.show_next_review(it, card["due_date"])
 
    if display.menu() == "next":
@@ -69,8 +97,8 @@ def lazy_generator(recorded: dict):
 
 display.banner()
 
-if os.path.exists("test.json") and os.path.getsize("test.json") > 0:
-  recorded = read_json("test.json")
+if os.path.exists(DATA_FILE) and os.path.getsize(DATA_FILE) > 0:
+  recorded = read_json(DATA_FILE)
 else:
   notes = read_multiline("Paste your notes")
   new_tree = extract_knowledge_tree(notes)

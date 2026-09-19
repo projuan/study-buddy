@@ -3,4 +3,4 @@ __pycache__/
 venv/
 data/
 index.json
-test.json
+progress.json
