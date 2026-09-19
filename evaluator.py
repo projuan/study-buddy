@@ -6,7 +6,7 @@ from knowledge_tree import Leaf
 from quiz import quiz
 load_dotenv()
 _client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-MODEL = "claude-opus-4-8"
+MODEL = "claude-opus-5"
 
 class Grade(BaseModel):
     score: int
@@ -16,7 +16,7 @@ def evaluator(leaf:Leaf, question:str, answer:str) -> Grade:
     message= _client.messages.parse(
          model=MODEL,
          max_tokens=1024,
-         messages=[{"role":"user" , "content":f"Grade the {answer} based on the {leaf} and {question} provide a score and a feedback"}],
+         messages=[{"role":"user" , "content":f"Grade the {answer} based on the {leaf} and {question} provide a score from 0 to  100 and a feedback "}],
          output_format=Grade
     )    
     return message.parsed_output

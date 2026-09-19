@@ -6,7 +6,7 @@ load_dotenv()
 
 _client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-MODEL = "claude-opus-4-8"
+MODEL = "claude-opus-5"
 
 
 def ask_claude(prompt: str, system: str = "") -> str:

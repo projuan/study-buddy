@@ -4,12 +4,8 @@ from tracker import *
 from quiz import quiz
 from evaluator import *
 from scheduler import *
-
-
-
-print("Welcome to Studdy Budyy!")
-#creted a knowlegetree based on notes
-print("generating question...")
+from datetime import datetime, timedelta
+import display
 
 
 #only leafs
@@ -30,57 +26,70 @@ def recording_leafs(leafs:list):
 
 
 def lazy_generator(recorded: dict):
-  names = list(recorded.keys()) 
-  if os.path.exists("index.json") and os.path.exists("index.json") > 0:
-     state = read_json("index.json")
-     i = state["i"]
-  else: 
-     i =0   
-  while( i < len(recorded) ): 
-   card = recorded[names[i]]
-   name = card["leaf"]["name"]
+  while(True): 
+   today = datetime.now()
+   due_name  , size= next_due(recorded)
+   if due_name is  None:
+     display.caught_up()
+     return
+   else:
+     name = due_name
+     card = recorded[due_name]
+
+   name = card["leaf"]["name"] 
    description = card["leaf"]["description"]
    leaf = Leaf(name=name,description=description)
-   question = quiz(leaf[i])
+   display.card_header(name, size)
+   display.thinking("generating question...")
+   question = quiz(leaf)
    card["question"] = question
-   print(question)
-   answer  = read_multiline("Please paste your answer here: ")
-   print("Calculating...")
-   while not answer:
-      answer = input("Answer can't be empty. Try again: ").strip()
-   score =  evaluator(leaf[i],question , answer)
+   display.show_question(question)
+   answer  = read_multiline("Your answer", blanks_needed=1)
+   display.thinking("grading...")
+   score =  evaluator(leaf,question , answer)
    new_score = converter(score.score)
    r,e,it = scheduling(new_score,card["repetition"],card["ease_factor"],card["interval"])
    card["repetition"] = r
    card["ease_factor"] = e
-   card["interval"] = it
+   card["interval"] = it 
+   new_date = today + timedelta(days=it)
+   card["due_date"] = new_date.strftime("%Y-%m-%d")
    write_json(recorded,"test.json")
-   choice = input("1. Generate next question\n2. Quit\nChoose: ").strip()
-   while choice not in ("1", "2"):
-    print("Type 1 or 2.")
-    choice = input("Choose: ").strip()
+   display.show_grade(score.score, score.feedback)
+   display.show_next_review(it, card["due_date"])
 
-   if choice == "1":
-     i = i + 1
+   if display.menu() == "next":
+    
      continue
-   elif choice == "2":
-     write_json({"i": i}, "index.json")
-     print("Goodbye!")
+   else:
+     display.goodbye()
      return
 
 
-if os.path.exists("test.json" and os.path.exists("test.json") > 0):
+
+display.banner()
+
+if os.path.exists("test.json") and os.path.getsize("test.json") > 0:
   recorded = read_json("test.json")
 else:
-  notes = read_multiline(input("Please paste your notes here"))
+  notes = read_multiline("Paste your notes")
   new_tree = extract_knowledge_tree(notes)
   list_of_leafs =  extracting_leafs(new_tree)   
   recorded = recording_leafs(list_of_leafs)
 
+
+def next_due(dates:dict):
+ due = []
+ today = datetime.now()
+ date = today.strftime("%Y-%m-%d")
+ for name in dates:
+   if dates[name]["due_date"]<= date:
+     due.append(name)  
+ if due == []:
+   return None , 0
+ else:
+   return  min(due,key=lambda n: dates[n]["due_date"]) , len(due)
+
+
+next_due(recorded)
 lazy_generator(recorded)
-
-
-
-
-
-
