@@ -19,7 +19,7 @@ class KnowledgeTree(BaseModel):
 
 
 _client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-MODEL = "claude-opus-4-8"
+MODEL = "claude-opus-5"
 def extract_knowledge_tree(notes:str) -> KnowledgeTree:
     response= _client.messages.parse(
         model=MODEL,
