@@ -13,22 +13,23 @@ comes back for review and when.
 
 ```
 ════════════════════════════════════════════════════════════════
-                           STUDY BUDDY
-                active recall + spaced repetition
+                           STUDY BUDDY                          
+                active recall + spaced repetition               
 ════════════════════════════════════════════════════════════════
 
+
 ────────────────────────────────────────────────────────────────
-  Chromosome Condensation  · 4 due
+  Daughter Cells  · 4 due
 ────────────────────────────────────────────────────────────────
 
   generating question...
 
   QUESTION
 
-  Explain why a cell must condense its long, uncoiled DNA into
-  compact chromosomes before it divides, and describe what
-  problems might arise during division if this condensation did
-  not occur.
+  Explain why the two daughter cells produced by mitosis are
+  genetically identical to each other and to the original
+  parent cell, describing the key events that ensure this
+  outcome.
 
   Your answer
   (Press Enter on an empty line when done)
@@ -36,21 +37,29 @@ comes back for review and when.
   grading...
 
 ────────────────────────────────────────────────────────────────
-  SCORE  ████████░░  82/100
+  SCORE  █████████░  90/100
 ────────────────────────────────────────────────────────────────
 
-  Strengths: You correctly identify the core reason for
-  condensation — uncondensed DNA is extremely long and
-  thread-like, and moving it in that state would cause tangling
-  and breakage. Linking breakage to loss or scrambling of
-  genetic information is a good causal explanation...
+  YOU UNDERSTAND THIS
+
+  WHAT YOU GOT RIGHT
+  Correctly centers the explanation on semiconservative S-phase
+  replication producing identical sister chromatids joined at
+  the centromere, with proofreading and mismatch repair
+  ensuring fidelity...
+
+  WHAT TO IMPROVE
+  Phrasing slips: at metaphase it is whole chromosomes (paired
+  sister chromatids) that align single-file, not individual
+  chromatids; cohesin cleavage by separase occurs at anaphase
+  onset...
 
   next review: tomorrow (2026-09-20)
 
   [Enter] next question   [q] quit
 ```
 
-That answer scored 82, which maps to SM-2 quality 4, so the card moved from
+That answer scored 90, which maps to SM-2 quality 4, so the card moved from
 `repetition 0` to `repetition 1` with an interval of 1 day and its ease factor
 held at 2.5.
 
@@ -64,14 +73,15 @@ does one job.
 | `ingest.py` | Reads pasted multi-line text from the terminal |
 | `knowledge_tree.py` | `extract_knowledge_tree(notes)` → a `KnowledgeTree` of `Branch`es and `Leaf`s |
 | `quiz.py` | `quiz(leaf)` → one open-ended question, as plain text |
-| `evaluator.py` | `evaluator(leaf, question, answer)` → a `Grade` (`score` 0-100, `feedback`) |
+| `evaluator.py` | `evaluator(leaf, question, answer)` → a `Grade` (`score` 0-100, `strengths`, `improvements`) |
 | `scheduler.py` | `converter()` maps 0-100 to SM-2 quality 0-5; `scheduling()` returns the new repetition, ease factor and interval |
 | `tracker.py` | `new_record()`, plus reading and writing the JSON store |
-| `display.py` | All terminal output — banner, headers, score bar, menu |
+| `display.py` | All terminal output — banner, headers, score bar, verdict, menu |
 | `claude_client.py` | `ask_claude()`, the shared plain-text call |
 | `main.py` | `next_due()` picks the card; `lazy_generator()` runs the loop |
 
-One record per concept, in a single JSON file:
+One record per concept, in a single JSON file (`progress.json`, gitignored
+so your review history stays off GitHub):
 
 ```json
 {
@@ -134,6 +144,29 @@ the shape part of the request instead of a hope.
 `quiz.py` deliberately doesn't do this. A question is different from a `Grade`
 because a `Grade` is an object and a question is text — one string, nothing to
 pull apart.
+
+**Bounding what comes back, not just asking for it.** `Grade` originally had a
+single `feedback` field with no length guidance and `max_tokens` at 1024. A long
+answer produced long feedback, the response hit the cap mid-string, and what came
+back was JSON with no closing brace — a `ValidationError` that killed the run
+*after* the API call had already been paid for.
+
+Raising the cap alone just moves the cliff further out. The real fix is asking
+for a bounded answer: `strengths` and `improvements` as two fields, each capped
+at 80 words in the prompt. Splitting the field turned out to be worth it on its
+own — the terminal can label the two blocks instead of printing one wall of text.
+
+**A verdict that can't drift from the scheduler.** Above the feedback is a
+plain-language line: `YOU UNDERSTAND THIS`, `A LITTLE MORE REVIEW`, or
+`HASN'T CLICKED YET`. The bands aren't picked by feel. The bottom one starts
+below 60, which is exactly where `converter()` falls under SM-2 quality 3 and
+`scheduling()` resets your repetition count to zero. What the screen says and
+what the algorithm does can never disagree.
+
+**Failing without losing the review.** Every API call goes through `with_retry`,
+which gives it a second attempt before giving up, and `write_json` runs on every
+exit path. A rate limit or a dropped connection now ends the session with a
+message instead of a traceback, and the work already done is still on disk.
 
 **Storing a due date, not a countdown.** Storing a date means the program
 doesn't have to be running overnight. When it runs, it runs once: it checks
